@@ -1,0 +1,204 @@
+@import "tailwindcss";
+
+/* ── Transpira design system (shared with transpiralabs.com, ../platform, ../build) ──
+   Cool near-white background, charcoal ink, a single cobalt-blue accent.
+   Montserrat + IBM Plex Mono. Demo-specific semantic colors for exception
+   severity live alongside the shared tokens. */
+
+@theme {
+  --color-background: oklch(0.985 0.002 250);
+  --color-foreground: oklch(0.225 0.013 262);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.225 0.013 262);
+  --color-muted: oklch(0.955 0.004 250);
+  --color-muted-foreground: oklch(0.5 0.018 260);
+  --color-accent: oklch(0.48 0.12 262);
+  --color-accent-foreground: oklch(0.99 0.004 250);
+  --color-primary: oklch(0.48 0.12 262);
+  --color-primary-foreground: oklch(0.99 0.004 250);
+  --color-border: oklch(0.225 0.013 262 / 0.12);
+  --color-ring: oklch(0.48 0.12 262 / 0.45);
+
+  /* Exception severity */
+  --color-critical: oklch(0.55 0.2 27);
+  --color-critical-soft: oklch(0.55 0.2 27 / 0.09);
+  --color-warning: oklch(0.62 0.13 70);
+  --color-warning-soft: oklch(0.62 0.13 70 / 0.11);
+  --color-healthy: oklch(0.56 0.12 155);
+  --color-healthy-soft: oklch(0.56 0.12 155 / 0.1);
+
+  /* System identity: which side an event came from */
+  --color-ops: oklch(0.48 0.12 262);
+  --color-partner: oklch(0.52 0.1 200);
+
+  /* Transport mode hues: road, air, ocean */
+  --mode-road: oklch(0.45 0.02 262);
+  --mode-air: oklch(0.55 0.09 230);
+  --mode-ocean: oklch(0.45 0.08 200);
+
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --radius: 0.75rem;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: oklch(0.48 0.12 262 / 0.16);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Big display numbers read tighter than body copy. */
+.display-tight {
+  letter-spacing: -0.02em;
+}
+
+/* ── Translucent material bar (TopBar) ──
+   A semi transparent card color over a backdrop blur, so content scrolls
+   under it. Where the viewer asks for less transparency, fall back to solid. */
+.material-bar {
+  background-color: color-mix(in oklab, var(--color-card) 78%, transparent);
+  backdrop-filter: saturate(1.4) blur(12px);
+  -webkit-backdrop-filter: saturate(1.4) blur(12px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .material-bar {
+    background-color: var(--color-card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Mono micro-label used for document types (204, 214, 210), refs, timestamps */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.soft-shadow {
+  box-shadow:
+    0 1px 2px oklch(0.225 0.013 262 / 0.05),
+    0 12px 32px -22px oklch(0.225 0.013 262 / 0.3);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Motion (Apple-style: quick, spring-settled, interruptible-feeling) ── */
+.rise {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--rise-delay, 0ms);
+}
+@keyframes rise {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* New ledger rows / exception cards materialize rather than pop */
+.event-enter {
+  animation: event-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes event-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Info bubbles arrive from the "i" they belong to, rather than fading in place */
+.info-pop {
+  transform-origin: top left;
+  animation: info-pop 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.info-pop-right {
+  transform-origin: top right;
+}
+.info-pop-up {
+  transform-origin: bottom left;
+}
+.info-pop-up.info-pop-right {
+  transform-origin: bottom right;
+}
+@keyframes info-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Live pulse for the simulation clock and in-flight statuses */
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ── Journey ribbon (ShipmentDetail signature element) ──
+   The customs gate pulses in amber, but only while a hold is open. */
+.customs-gate-pulse {
+  animation: customs-gate-pulse 1.8s ease-in-out infinite;
+}
+@keyframes customs-gate-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(0.62 0.13 70 / 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 5px oklch(0.62 0.13 70 / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .event-enter,
+  .info-pop {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .pulse-dot,
+  .customs-gate-pulse {
+    animation: none;
+  }
+}
