@@ -116,9 +116,9 @@ export function KpiStrip({
             </span>
             <span className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
               <span
-                className="block h-full rounded-full transition-[width] duration-700 ease-out"
+                className="block h-full w-full origin-left rounded-full transition-transform duration-700 ease-out motion-reduce:transition-none"
                 style={{
-                  width: `${pct}%`,
+                  transform: `scaleX(${pct / 100})`,
                   backgroundColor:
                     pct === 100 ? "var(--color-healthy)" : "var(--color-accent)",
                 }}

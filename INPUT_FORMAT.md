@@ -102,7 +102,7 @@ a border. `equipment` reads by mode: road `"53' dry van"`, air
 {
   "shipmentId": "AEQ-7319",
   "partner": { "name": "Blue Gulf Line", "code": "SCAC-BGLU" },
-  "carrierRateUsd": 3600
+  "partnerRateUsd": 3600
 }
 ```
 

@@ -216,12 +216,20 @@ function fromException(ex: ExceptionRecord): Issue | undefined {
   return issue;
 }
 
-/** Partner events on a shipment, in time order: pickup, pings, delivery. */
+/**
+ * Partner events on a shipment, in time order: pickup, pings, delivery, plus
+ * customs and booking events. Matches the engine's idea of partner contact,
+ * so a vessel that just posted a customs hold does not read as a blackout.
+ */
 function partnerPings(o: ShipmentEntity): { at: string; where: string }[] {
   const out: { at: string; where: string }[] = [];
   if (o.pickup) out.push({ at: o.pickup.at, where: o.pickup.location });
   for (const s of o.statusUpdates) out.push({ at: s.at, where: s.location });
   if (o.delivery) out.push({ at: o.delivery.at, where: o.delivery.location });
+  if (o.customsHold) out.push({ at: o.customsHold.at, where: "customs" });
+  if (o.customsCleared)
+    out.push({ at: o.customsCleared.at, where: "customs" });
+  if (o.rolled) out.push({ at: o.rolled.at, where: "the ocean line" });
   return out.sort((a, b) => ms(a.at) - ms(b.at));
 }
 

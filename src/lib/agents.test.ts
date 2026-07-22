@@ -310,6 +310,23 @@ describe("tracking blackout", () => {
     expect(r.status).toBe("needs_you");
     expect(r.ask!.why).toContain("Bayou City Freight");
   });
+
+  it("counts a customs event as contact, so no phantom win is invented", () => {
+    // Cross border road move. The only partner traffic between pickup and the
+    // next ping is a customs hold. That hold is contact, so the shipment was
+    // never dark and no blackout run should exist, not even a resolved one.
+    const bridged = [
+      tender("m1", D("06:00"), { international: true }),
+      assign("m2", D("06:10")),
+      accept("m3", D("06:20")),
+      pickup("m4", D("09:00")),
+      customsHold("m5", D("10:30"), "CBP exam hold on entry"),
+      ping("m6", D("12:30")),
+      deliver("m7", D("13:00")),
+    ];
+    const r = byType(run(bridged, D("19:00")).runs, "TRACKING_BLACKOUT");
+    expect(r).toBeUndefined();
+  });
 });
 
 // ── TENDER_UNANSWERED ───────────────────────────────────────────────────────

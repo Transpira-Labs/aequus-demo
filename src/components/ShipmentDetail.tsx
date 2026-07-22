@@ -295,7 +295,8 @@ function JourneyRibbon({ shipment }: { shipment: ShipmentEntity }) {
     if (isReached(n)) lastReached = i;
   });
   const insetPct = 50 / N;
-  const fillWidthPct = lastReached >= 0 ? (lastReached / N) * 100 : 0;
+  // Scale of the full track (node 0 center to node N-1 center) that is filled.
+  const fillScale = lastReached > 0 ? lastReached / (N - 1) : 0;
 
   return (
     <div>
@@ -310,10 +311,11 @@ function JourneyRibbon({ shipment }: { shipment: ShipmentEntity }) {
         {/* filled track, tinted by mode */}
         <span
           aria-hidden
-          className="absolute top-[9px] h-0.5 rounded-full transition-[width] duration-500 ease-out"
+          className="absolute top-[9px] h-0.5 origin-left rounded-full transition-transform duration-500 ease-out motion-reduce:transition-none"
           style={{
             left: `${insetPct}%`,
-            width: `${fillWidthPct}%`,
+            right: `${insetPct}%`,
+            transform: `scaleX(${fillScale})`,
             backgroundColor: hue,
           }}
         />

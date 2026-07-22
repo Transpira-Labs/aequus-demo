@@ -308,7 +308,7 @@ const RAW: FeedEvent[] = [
   assign("OPS-000031", T("17:45"), "AEQ-7303", LONE, 1950),
 
   // ── CLEAN (air): AEQ-7304, Halcyon Aviation Parts, Houston IAH → Miami FL ───
-  tender("OPS-000040", T("06:45"), "AEQ-7304", HALCYON, IAH, MIA, T("09:30"), T("13:30"), "air freight, 2 pallets", 9600, 1200, "air", "PO-HA-71144"),
+  tender("OPS-000040", T("06:45"), "AEQ-7304", HALCYON, IAH, MIA, T("09:30"), T("13:30"), "air freight, 2 pallets", 880, 1200, "air", "PO-HA-71144"),
   assign("OPS-000041", T("06:55"), "AEQ-7304", TGAC, 950),
   accept("PTR-000040", T("07:10"), "AEQ-7304", TGAC),
   pickup("PTR-000041", T("09:20"), "AEQ-7304", "Houston, TX (IAH)"),
@@ -376,7 +376,7 @@ const RAW: FeedEvent[] = [
   // ── CLEAN (air, intl export): AEQ-7310, Permian Energy, Houston IAH → FRA ───
   // Export clears customs about an hour after the airline takes the cargo, then
   // the shipment runs clean to recovery in Frankfurt.
-  tender("OPS-000100", T("07:20"), "AEQ-7310", PERMIAN, IAH, FRANKFURT, T("08:30"), T("17:00"), "air freight, 2 pallets", 8800, 2100, "air", "PO-PE-40930", true),
+  tender("OPS-000100", T("07:20"), "AEQ-7310", PERMIAN, IAH, FRANKFURT, T("08:30"), T("17:00"), "air freight, 2 pallets", 740, 2100, "air", "PO-PE-40930", true),
   assign("OPS-000101", T("07:30"), "AEQ-7310", TGAC, 1650),
   accept("PTR-000100", T("07:50"), "AEQ-7310", TGAC),
   pickup("PTR-000101", T("08:25"), "AEQ-7310", "Houston, TX (IAH)"),
