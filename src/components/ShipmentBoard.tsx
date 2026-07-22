@@ -2,12 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { PackageSearch } from "lucide-react";
-import type { GraphState, ShipmentEntity, Severity } from "@/lib/types";
+import type {
+  GraphState,
+  ShipmentEntity,
+  Severity,
+  TransportMode,
+} from "@/lib/types";
 import { StatusChip, ModeBadge } from "./chips";
 import { InfoBubble } from "./InfoBubble";
 import {
   int,
   laneOf,
+  modeLabel,
   severityColor,
   SEVERITY_RANK,
   isInternational,
@@ -22,10 +28,12 @@ export function ShipmentBoard({
   state,
   selectedShipmentId,
   onSelect,
+  modeFilter = null,
 }: {
   state: GraphState;
   selectedShipmentId: string | null;
   onSelect: (shipmentId: string) => void;
+  modeFilter?: TransportMode | null;
 }) {
   // The happy path lives in the client's own systems. This board earns its
   // place by showing the gaps, so clean shipments stay hidden unless asked for.
@@ -38,10 +46,10 @@ export function ShipmentBoard({
   }, [state.exceptions]);
 
   const allShipments = useMemo(() => {
-    return Object.values(state.shipments).sort(
-      (a, b) => shipmentCreationMs(b) - shipmentCreationMs(a)
-    );
-  }, [state.shipments]);
+    return Object.values(state.shipments)
+      .filter((s) => !modeFilter || s.mode === modeFilter)
+      .sort((a, b) => shipmentCreationMs(b) - shipmentCreationMs(a));
+  }, [state.shipments, modeFilter]);
 
   const withIssues = useMemo(
     () => allShipments.filter((s) => s.exceptionIds.length > 0),
@@ -96,12 +104,16 @@ export function ShipmentBoard({
             </div>
             <p className="text-sm font-semibold text-foreground">
               {allShipments.length === 0
-                ? "Waiting for the day to start"
+                ? modeFilter
+                  ? `No ${modeLabel(modeFilter).toLowerCase()} shipments yet`
+                  : "Waiting for the day to start"
                 : "Every shipment is running clean"}
             </p>
             <p className="mt-1 max-w-[18rem] text-[0.8rem] text-muted-foreground">
               {allShipments.length === 0
-                ? "When customers book shipments, they show up here."
+                ? modeFilter
+                  ? "Pick another mode above, or All modes to see the whole board."
+                  : "When customers book shipments, they show up here."
                 : "Nothing needs work. The full list stays in your own systems, or flip the switch above to see it here."}
             </p>
           </div>

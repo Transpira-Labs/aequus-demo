@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSimulation } from "@/hooks/useSimulation";
 import { TopBar } from "@/components/TopBar";
 import { KpiStrip } from "@/components/KpiStrip";
+import { ModeStrip } from "@/components/ModeStrip";
 import { ShipmentBoard } from "@/components/ShipmentBoard";
 import { SidePanel, type SideTab } from "@/components/SidePanel";
 import { ShipmentDetail } from "@/components/ShipmentDetail";
 import type { AgentRun } from "@/lib/agentTypes";
+import type { TransportMode } from "@/lib/types";
 import {
   TIME_SCOPES,
   scopeStartMs,
@@ -21,28 +23,44 @@ export default function ControlTower() {
   );
   const [sideTab, setSideTab] = useState<SideTab>("issues");
   const [scope, setScope] = useState<TimeScope>("day");
+  // One platform, three services. Picking a mode focuses the whole screen.
+  const [modeFilter, setModeFilter] = useState<TransportMode | null>(null);
+
+  // Mode of the shipment behind an id. Undefined when the id is unknown.
+  const modeOf = useCallback(
+    (id?: string) => (id ? sim.state.shipments[id]?.mode : undefined),
+    [sim.state.shipments]
+  );
 
   // Scoping is a view filter, not retention: narrowing hides older rows from
   // the feeds, widening brings them straight back.
   const scopeStart = scopeStartMs(scope, sim.simTime);
-  const scopedExceptions = useMemo(
-    () =>
-      scopeStart === -Infinity
-        ? sim.state.exceptions
-        : sim.state.exceptions.filter(
-            (e) => Date.parse(e.detectedAt) >= scopeStart
-          ),
-    [sim.state.exceptions, scopeStart]
-  );
-  const scopedEvents = useMemo(
-    () =>
-      scopeStart === -Infinity
-        ? sim.state.events
-        : sim.state.events.filter(
-            (e) => Date.parse(e.occurredAt) >= scopeStart
-          ),
-    [sim.state.events, scopeStart]
-  );
+  // The mode filter hides rows tied to another mode. Rows that cannot be tied
+  // to a shipment stay visible; they are not about any one mode.
+  const scopedExceptions = useMemo(() => {
+    let list = sim.state.exceptions;
+    if (scopeStart !== -Infinity)
+      list = list.filter((e) => Date.parse(e.detectedAt) >= scopeStart);
+    if (modeFilter)
+      list = list.filter((e) => {
+        const m = modeOf(e.shipmentId);
+        return m === undefined || m === modeFilter;
+      });
+    return list;
+  }, [sim.state.exceptions, scopeStart, modeFilter, modeOf]);
+  const scopedEvents = useMemo(() => {
+    let list = sim.state.events;
+    if (scopeStart !== -Infinity)
+      list = list.filter((e) => Date.parse(e.occurredAt) >= scopeStart);
+    if (modeFilter)
+      list = list.filter((e) => {
+        const m = modeOf(
+          (e.payload as { shipmentId?: string }).shipmentId
+        );
+        return m === undefined || m === modeFilter;
+      });
+    return list;
+  }, [sim.state.events, scopeStart, modeFilter, modeOf]);
 
   // One lookup so every exception card can say what its agent is doing.
   const runByException = useMemo(() => {
@@ -99,6 +117,15 @@ export default function ControlTower() {
         <KpiStrip state={sim.state} agents={sim.agents} />
       </div>
 
+      {/* one platform: air, land, and sea feeding the same board */}
+      <div className="shrink-0 px-4 pt-2.5">
+        <ModeStrip
+          state={sim.state}
+          selected={modeFilter}
+          onSelect={setModeFilter}
+        />
+      </div>
+
       {/* time scope: how far back the feeds look from the sim clock */}
       <div className="flex shrink-0 items-center justify-end gap-1.5 px-4 pt-2.5">
         <span className="text-[0.72rem] font-medium text-muted-foreground">
@@ -132,6 +159,7 @@ export default function ControlTower() {
             state={sim.state}
             selectedShipmentId={selectedShipmentId}
             onSelect={openShipment}
+            modeFilter={modeFilter}
           />
         </section>
 
