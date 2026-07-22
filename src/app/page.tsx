@@ -4,12 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSimulation } from "@/hooks/useSimulation";
 import { TopBar } from "@/components/TopBar";
 import { KpiStrip } from "@/components/KpiStrip";
-import { ModeStrip } from "@/components/ModeStrip";
+import {
+  ServiceFilter,
+  inService,
+  type ServiceKey,
+} from "@/components/ServiceFilter";
 import { ShipmentBoard } from "@/components/ShipmentBoard";
 import { SidePanel, type SideTab } from "@/components/SidePanel";
 import { ShipmentDetail } from "@/components/ShipmentDetail";
 import type { AgentRun } from "@/lib/agentTypes";
-import type { TransportMode } from "@/lib/types";
 import {
   TIME_SCOPES,
   scopeStartMs,
@@ -23,44 +26,46 @@ export default function ControlTower() {
   );
   const [sideTab, setSideTab] = useState<SideTab>("issues");
   const [scope, setScope] = useState<TimeScope>("day");
-  // One platform, three services. Picking a mode focuses the whole screen.
-  const [modeFilter, setModeFilter] = useState<TransportMode | null>(null);
+  // One platform, four services. Picking one focuses the whole screen.
+  const [serviceFilter, setServiceFilter] = useState<ServiceKey | null>(null);
 
-  // Mode of the shipment behind an id. Undefined when the id is unknown.
-  const modeOf = useCallback(
-    (id?: string) => (id ? sim.state.shipments[id]?.mode : undefined),
-    [sim.state.shipments]
+  // Whether the shipment behind an id falls under the picked service.
+  // Undefined when the id is unknown, so the caller can keep the row.
+  const inPickedService = useCallback(
+    (id?: string) => {
+      if (!serviceFilter) return true;
+      const s = id ? sim.state.shipments[id] : undefined;
+      return s ? inService(s, serviceFilter) : undefined;
+    },
+    [sim.state.shipments, serviceFilter]
   );
 
   // Scoping is a view filter, not retention: narrowing hides older rows from
   // the feeds, widening brings them straight back.
   const scopeStart = scopeStartMs(scope, sim.simTime);
-  // The mode filter hides rows tied to another mode. Rows that cannot be tied
-  // to a shipment stay visible; they are not about any one mode.
+  // The service filter hides rows tied to another service. Rows that cannot
+  // be tied to a shipment stay visible; they are not about any one service.
   const scopedExceptions = useMemo(() => {
     let list = sim.state.exceptions;
     if (scopeStart !== -Infinity)
       list = list.filter((e) => Date.parse(e.detectedAt) >= scopeStart);
-    if (modeFilter)
-      list = list.filter((e) => {
-        const m = modeOf(e.shipmentId);
-        return m === undefined || m === modeFilter;
-      });
+    if (serviceFilter)
+      list = list.filter((e) => inPickedService(e.shipmentId) !== false);
     return list;
-  }, [sim.state.exceptions, scopeStart, modeFilter, modeOf]);
+  }, [sim.state.exceptions, scopeStart, serviceFilter, inPickedService]);
   const scopedEvents = useMemo(() => {
     let list = sim.state.events;
     if (scopeStart !== -Infinity)
       list = list.filter((e) => Date.parse(e.occurredAt) >= scopeStart);
-    if (modeFilter)
-      list = list.filter((e) => {
-        const m = modeOf(
-          (e.payload as { shipmentId?: string }).shipmentId
-        );
-        return m === undefined || m === modeFilter;
-      });
+    if (serviceFilter)
+      list = list.filter(
+        (e) =>
+          inPickedService(
+            (e.payload as { shipmentId?: string }).shipmentId
+          ) !== false
+      );
     return list;
-  }, [sim.state.events, scopeStart, modeFilter, modeOf]);
+  }, [sim.state.events, scopeStart, serviceFilter, inPickedService]);
 
   // One lookup so every exception card can say what its agent is doing.
   const runByException = useMemo(() => {
@@ -117,20 +122,17 @@ export default function ControlTower() {
         <KpiStrip state={sim.state} agents={sim.agents} />
       </div>
 
-      {/* one platform: air, land, and sea feeding the same board */}
-      <div className="shrink-0 px-4 pt-2.5">
-        <ModeStrip
+      {/* filters: the service menu on the left, the time scope on the right */}
+      <div className="flex shrink-0 items-center justify-between gap-1.5 px-4 pt-2.5">
+        <ServiceFilter
           state={sim.state}
-          selected={modeFilter}
-          onSelect={setModeFilter}
+          selected={serviceFilter}
+          onSelect={setServiceFilter}
         />
-      </div>
-
-      {/* time scope: how far back the feeds look from the sim clock */}
-      <div className="flex shrink-0 items-center justify-end gap-1.5 px-4 pt-2.5">
-        <span className="text-[0.72rem] font-medium text-muted-foreground">
-          Showing
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[0.72rem] font-medium text-muted-foreground">
+            Showing
+          </span>
         {TIME_SCOPES.map((s) => {
           const active = scope === s.key;
           return (
@@ -149,6 +151,7 @@ export default function ControlTower() {
             </button>
           );
         })}
+        </div>
       </div>
 
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 lg:grid-cols-12 lg:grid-rows-1 lg:overflow-hidden">
@@ -159,7 +162,7 @@ export default function ControlTower() {
             state={sim.state}
             selectedShipmentId={selectedShipmentId}
             onSelect={openShipment}
-            modeFilter={modeFilter}
+            serviceFilter={serviceFilter}
           />
         </section>
 
