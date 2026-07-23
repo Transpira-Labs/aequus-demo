@@ -1,10 +1,29 @@
 "use client";
 
 import { useMemo } from "react";
-import type { FeedEvent } from "@/lib/types";
+import type {
+  ConnectorStatusPayload,
+  FeedEvent,
+  ShipmentEntity,
+} from "@/lib/types";
+import { appOf, sourceAppName } from "@/lib/sources";
 import { SourceChip } from "./chips";
 import { InfoBubble } from "./InfoBubble";
 import { docType, formatTime, eventShipmentId, eventVerb } from "./util";
+
+/** The app a row arrived through, so every message can name its source. */
+function appLabelOf(
+  ev: FeedEvent,
+  shipments: Record<string, ShipmentEntity>
+): string | undefined {
+  if (ev.type.startsWith("connector.")) {
+    return sourceAppName((ev.payload as ConnectorStatusPayload).app);
+  }
+  const id = eventShipmentId(ev);
+  const mode = id ? shipments[id]?.mode ?? "road" : "road";
+  const app = appOf(ev.type, mode);
+  return app ? sourceAppName(app) : undefined;
+}
 
 // Its own tab now, with the full panel height, so it can hold more history.
 const MAX_ROWS = 50;
@@ -12,12 +31,15 @@ const MAX_ROWS = 50;
 export function EventLedger({
   events,
   totalToday,
+  shipments,
   embedded = false,
 }: {
   /** Messages inside the current time scope, in occurredAt order. */
   events: FeedEvent[];
   /** Everything ingested today, so a narrowed scope can say what it hides. */
   totalToday: number;
+  /** For resolving which app carried each message (mode decides the portal). */
+  shipments: Record<string, ShipmentEntity>;
   /** Inside the tabbed panel the card chrome and title come from the parent. */
   embedded?: boolean;
 }) {
@@ -53,7 +75,8 @@ export function EventLedger({
           first. OPS is the Aequus desk, PTR is a partner. The number is the
           freight document type: 204 is a shipment tender, 990 is the partner
           answering yes or no, 214 is a status update, 210 is an invoice, and
-          CBP is a customs entry message.
+          CBP is a customs entry message. Each row also names the app the
+          message came through, like Truckstop or QuickBooks.
         </InfoBubble>
       </div>
 
@@ -83,6 +106,12 @@ export function EventLedger({
                       <span className="font-mono text-foreground">
                         {" · "}
                         {shipmentId}
+                      </span>
+                    )}
+                    {appLabelOf(ev, shipments) && (
+                      <span className="text-muted-foreground/70">
+                        {" · "}
+                        {appLabelOf(ev, shipments)}
                       </span>
                     )}
                   </span>

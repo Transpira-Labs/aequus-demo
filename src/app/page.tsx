@@ -9,6 +9,7 @@ import {
   inService,
   type ServiceKey,
 } from "@/components/ServiceFilter";
+import { ConnectedSystems } from "@/components/ConnectedSystems";
 import { ShipmentBoard } from "@/components/ShipmentBoard";
 import { SidePanel, type SideTab } from "@/components/SidePanel";
 import { ShipmentDetail } from "@/components/ShipmentDetail";
@@ -122,13 +123,19 @@ export default function ControlTower() {
         <KpiStrip state={sim.state} agents={sim.agents} />
       </div>
 
-      {/* filters: the service menu on the left, the time scope on the right */}
+      {/* filters: service menu and connected systems left, time scope right */}
       <div className="flex shrink-0 items-center justify-between gap-1.5 px-4 pt-2.5">
-        <ServiceFilter
-          state={sim.state}
-          selected={serviceFilter}
-          onSelect={setServiceFilter}
-        />
+        <div className="flex items-center gap-1.5">
+          <ServiceFilter
+            state={sim.state}
+            selected={serviceFilter}
+            onSelect={setServiceFilter}
+          />
+          <ConnectedSystems
+            connectors={sim.state.connectors}
+            simTime={sim.simTime}
+          />
+        </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[0.72rem] font-medium text-muted-foreground">
             Showing
@@ -173,6 +180,7 @@ export default function ControlTower() {
             onTabChange={setSideTab}
             events={scopedEvents}
             totalEvents={sim.state.events.length}
+            shipments={sim.state.shipments}
             exceptions={scopedExceptions}
             totalExceptions={sim.state.exceptions.length}
             simTime={sim.simTime}

@@ -1,5 +1,6 @@
 import { Unlink } from "lucide-react";
 import type { Evidence } from "@/lib/types";
+import { sourceAppName } from "@/lib/sources";
 import { systemColor, softBg } from "./util";
 
 /**
@@ -116,6 +117,11 @@ function EvidenceCell({
       <div className="font-mono text-sm font-semibold text-foreground tnum">
         {ev.value}
       </div>
+      {ev.via && (
+        <div className="text-[0.6rem] text-muted-foreground/70">
+          from {sourceAppName(ev.via)}
+        </div>
+      )}
     </div>
   );
 }

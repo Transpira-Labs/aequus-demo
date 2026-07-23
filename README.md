@@ -23,6 +23,10 @@ and the partner network and catches each gap as it opens.
   events mirror CBP entry status. The format is documented in
   [INPUT_FORMAT.md](INPUT_FORMAT.md)
 - Stitches every event to the shipment behind it, across both sides
+- Names the app every message came through: Truckstop for road, QuickBooks for
+  invoices, ACE for customs entries, partner portals for air and ocean, and
+  email for bookings and paperwork. A connected systems panel shows each
+  feed's health, what access it was granted, and flags a dying login early
 - Detects 9 issue types: unanswered tenders, missed pickups, tracking
   blackouts, late deliveries, missing PODs, invoice overcharges, duplicate
   events, customs holds, and rolled bookings

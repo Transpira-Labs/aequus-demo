@@ -1,6 +1,6 @@
 "use client";
 
-import type { ExceptionRecord, FeedEvent } from "@/lib/types";
+import type { ExceptionRecord, FeedEvent, ShipmentEntity } from "@/lib/types";
 import type { AssignmentMap } from "@/lib/assignments";
 import type {
   AgentId,
@@ -25,6 +25,7 @@ export function SidePanel({
   onTabChange,
   events,
   totalEvents,
+  shipments,
   exceptions,
   totalExceptions,
   simTime,
@@ -45,6 +46,8 @@ export function SidePanel({
   events: FeedEvent[];
   /** Everything ingested today, regardless of scope. */
   totalEvents: number;
+  /** For naming the app each ledger message came through. */
+  shipments: Record<string, ShipmentEntity>;
   /** Issues inside the current time scope. */
   exceptions: ExceptionRecord[];
   /** Today's full issue count, regardless of scope. */
@@ -147,7 +150,12 @@ export function SidePanel({
         className={tab === "network" ? "flex min-h-0 flex-1 flex-col" : ""}
       >
         {tab === "network" && (
-          <EventLedger events={events} totalToday={totalEvents} embedded />
+          <EventLedger
+            events={events}
+            totalToday={totalEvents}
+            shipments={shipments}
+            embedded
+          />
         )}
       </div>
     </div>

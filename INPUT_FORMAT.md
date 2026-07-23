@@ -58,6 +58,24 @@ thresholds change by mode (see the exception table).
 | `customs.hold` | PARTNER | CBP entry status | Customs put a hold on the entry. |
 | `customs.cleared` | PARTNER | CBP entry status | Customs released the entry. |
 | `booking.rolled` | PARTNER | booking change | The ocean line moved the box to a later sailing. |
+| `connector.degraded` | OPS | sync layer | A connected app's feed is running behind. |
+| `connector.restored` | OPS | sync layer | The feed caught back up. |
+| `connector.auth_expiring` | OPS | sync layer | A connected app's login token is about to die. |
+
+## Source apps
+
+Every shipment message is attributed to the app it arrived through, so the UI
+can name the source of every fact. Attribution is derived from the event type
+and the shipment's mode (see [`src/lib/sources.ts`](src/lib/sources.ts)):
+
+| App | Carries |
+|---|---|
+| Truckstop | Road loads, rate confirmations, and truck tracking |
+| QuickBooks | Partner invoices and payments |
+| ACE (CBP customs) | Customs entry status: holds, exams, and releases |
+| Airline portal | Air waybill bookings and flight milestones |
+| Ocean line portal | Ocean bookings, sailings, and container events |
+| Email inbox | Customer bookings and paperwork like PODs |
 
 ## Partner reference
 
@@ -163,6 +181,21 @@ a border. `equipment` reads by mode: road `"53' dry van"`, air
   "toVessel": "BG Atlas 25W",
   "newEtd": "2026-07-25T06:00:00Z"
 }
+```
+
+### `connector.degraded` / `connector.restored` / `connector.auth_expiring`
+
+Status messages about a connected app, from the platform's own sync layer.
+They are not tied to any shipment. `app` is one of `truckstop`, `quickbooks`,
+`ace`, `airline`, `oceanline`, or `email`. `expiresAt` only appears on
+`connector.auth_expiring`.
+
+```json
+{ "app": "truckstop", "at": "2026-07-20T09:40:00Z", "note": "Status feed running behind" }
+```
+
+```json
+{ "app": "quickbooks", "at": "2026-07-20T08:15:00Z", "note": "Login token runs out in 3 days", "expiresAt": "2026-07-23T08:15:00Z" }
 ```
 
 ## What the engine detects
