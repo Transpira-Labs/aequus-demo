@@ -10,6 +10,7 @@ import {
   type ServiceKey,
 } from "@/components/ServiceFilter";
 import { ConnectedSystems } from "@/components/ConnectedSystems";
+import { CommandSearch } from "@/components/CommandSearch";
 import { ShipmentBoard } from "@/components/ShipmentBoard";
 import { SidePanel, type SideTab } from "@/components/SidePanel";
 import { ShipmentDetail } from "@/components/ShipmentDetail";
@@ -117,7 +118,12 @@ export default function ControlTower() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <TopBar sim={sim} />
+      <TopBar
+        sim={sim}
+        searchSlot={
+          <CommandSearch state={sim.state} onOpenShipment={openShipment} />
+        }
+      />
 
       <div className="shrink-0 px-4 pt-3">
         <KpiStrip state={sim.state} agents={sim.agents} />

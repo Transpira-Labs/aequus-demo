@@ -18,7 +18,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Transpira · Aequus Worldwide Logistics",
   description:
-    "A demo built for Aequus Worldwide Logistics. It sits between Aequus Ops and the partner network across road, air, and ocean, watches the traffic between them, and catches problems as they happen.",
+    "One place to see and run the whole operation. Built for Aequus Worldwide Logistics: it sits on top of the tools Aequus already uses, unifies road, air, and ocean freight plus customs into one feed the team can search, monitor, and act from, and runs AI agents that take repetitive work off the team's plate.",
 };
 
 export default function RootLayout({

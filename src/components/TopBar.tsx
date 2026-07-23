@@ -6,7 +6,14 @@ import { SPEEDS } from "@/hooks/useSimulation";
 import { Scrubber } from "./Scrubber";
 import { formatClock } from "./util";
 
-export function TopBar({ sim }: { sim: Simulation }) {
+export function TopBar({
+  sim,
+  searchSlot,
+}: {
+  sim: Simulation;
+  /** The global search trigger and palette, owned by the page. */
+  searchSlot?: React.ReactNode;
+}) {
   return (
     <header className="material-bar relative z-20 shrink-0 border-b border-border">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5">
@@ -27,6 +34,8 @@ export function TopBar({ sim }: { sim: Simulation }) {
         </div>
 
         <span className="grow" />
+
+        {searchSlot}
 
         {/* clock */}
         <div className="flex items-center gap-2">

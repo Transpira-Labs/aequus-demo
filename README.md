@@ -15,6 +15,12 @@ gets paid anyway. A container sits on a customs hold, or a booking rolls to a
 later sailing, and the promised date slips. This layer sits between Aequus Ops
 and the partner network and catches each gap as it opens.
 
+The demo shows both halves of the pilot. The unified platform: one feed on top
+of the tools Aequus already uses (Truckstop, QuickBooks, ACE, partner portals,
+email) that the team can search, monitor, and act from. And the AI agents: a
+layer that takes the repetitive chasing and checking off the team's plate,
+while every critical decision stays with a person.
+
 ## What it does
 
 - Ingests JSON feed events across all three modes. Road maps to the EDI
