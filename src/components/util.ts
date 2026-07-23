@@ -92,6 +92,9 @@ const DOC: Record<EventType, string> = {
   "customs.hold": "CBP",
   "customs.cleared": "CBP",
   "booking.rolled": "B/L",
+  "connector.degraded": "SYS",
+  "connector.restored": "SYS",
+  "connector.auth_expiring": "SYS",
 };
 
 export function docType(t: EventType): string {
@@ -149,6 +152,12 @@ export function eventVerb(t: EventType, mode: TransportMode = "road"): string {
       return "Customs cleared";
     case "booking.rolled":
       return "Booking rolled";
+    case "connector.degraded":
+      return "Feed running behind";
+    case "connector.restored":
+      return "Feed caught up";
+    case "connector.auth_expiring":
+      return "Login expiring";
   }
 }
 
@@ -335,6 +344,16 @@ export function summarize(ev: FeedEvent): string {
       const roll =
         from && to ? `Rolled ${from} to ${to}` : "Booking rolled to a new vessel";
       return etd ? `${roll} · new ETD ${formatTime(etd)}` : roll;
+    }
+    case "connector.degraded": {
+      const note = p.note as string | undefined;
+      return note ?? "Feed running behind";
+    }
+    case "connector.restored":
+      return "Feed caught up";
+    case "connector.auth_expiring": {
+      const note = p.note as string | undefined;
+      return note ?? "Login token expiring soon";
     }
   }
 }

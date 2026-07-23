@@ -14,6 +14,8 @@
 import {
   PartnerRef,
   BookingRolledPayload,
+  ConnectorEntity,
+  ConnectorStatusPayload,
   CustomsClearedPayload,
   CustomsHoldPayload,
   DeliveryCompletedPayload,
@@ -32,9 +34,11 @@ import {
   ISSUE_HISTORY,
   SLA,
   StatusUpdatePayload,
+  SourceApp,
   TenderResponsePayload,
   frequencyOf,
 } from "./types";
+import { SOURCE_APPS, appOf, modeApp } from "./sources";
 
 /** What a detector produces; the engine stamps the frequency fields on push. */
 type ExceptionDraft = Omit<ExceptionRecord, "frequency" | "timesSeenBefore">;
@@ -310,7 +314,72 @@ export function buildState(events: FeedEvent[], simTime: Date): GraphState {
     return d !== 0 ? d : a.id.localeCompare(b.id);
   });
 
-  return { simTime: simIso, events: sorted, shipments, exceptions };
+  const connectors = deriveConnectors(sorted, shipments);
+
+  return { simTime: simIso, events: sorted, shipments, exceptions, connectors };
+}
+
+// ── connected apps ───────────────────────────────────────────────────────────
+
+/**
+ * Health of each connected app, derived from the same stream. Every shipment
+ * message counts toward the app it arrived through; connector status messages
+ * flip an app to slow, back to connected, or to needing a login renewal.
+ */
+function deriveConnectors(
+  events: FeedEvent[],
+  shipments: Record<string, ShipmentEntity>
+): ConnectorEntity[] {
+  const by = new Map<SourceApp, ConnectorEntity>(
+    SOURCE_APPS.map((a) => [
+      a.key,
+      { app: a.key, status: "connected" as const, eventsToday: 0 },
+    ])
+  );
+  const openSince = new Map<SourceApp, { from: string; note: string }>();
+
+  for (const e of events) {
+    if (
+      e.type === "connector.degraded" ||
+      e.type === "connector.restored" ||
+      e.type === "connector.auth_expiring"
+    ) {
+      const p = e.payload as ConnectorStatusPayload;
+      const c = by.get(p.app);
+      if (!c) continue;
+      if (e.type === "connector.degraded") {
+        openSince.set(p.app, {
+          from: p.at,
+          note: p.note ?? "Feed running behind",
+        });
+        c.status = "slow";
+        c.note = p.note ?? "Feed running behind";
+      } else if (e.type === "connector.restored") {
+        const open = openSince.get(p.app);
+        if (open) {
+          c.incident = { from: open.from, to: p.at, note: open.note };
+          openSince.delete(p.app);
+        }
+        c.note = undefined;
+        c.status = c.authExpiresAt ? "attention" : "connected";
+      } else {
+        c.authExpiresAt = p.expiresAt;
+        if (c.status === "connected") c.status = "attention";
+      }
+      continue;
+    }
+
+    const shipmentId = shipmentIdOfEvent(e);
+    const mode = shipmentId ? shipments[shipmentId]?.mode ?? "road" : "road";
+    const app = appOf(e.type, mode);
+    if (!app) continue;
+    const c = by.get(app)!;
+    c.eventsToday += 1;
+    if (!c.lastEventAt || ms(e.occurredAt) > ms(c.lastEventAt))
+      c.lastEventAt = e.occurredAt;
+  }
+
+  return SOURCE_APPS.map((a) => by.get(a.key)!);
 }
 
 // ── status derivation ────────────────────────────────────────────────────────
@@ -382,8 +451,8 @@ function detectTenderUnanswered(
       `after ${waited}. The limit is ${SLA.tenderResponseMinutes} min. Until a partner accepts, nobody is ` +
       `committed to move this shipment, so the pickup is at risk.`,
     evidence: [
-      { source: "OPS", label: "Tendered to partner", value: shortTime(c.latestAssignAt) },
-      { source: "PARTNER", label: "Accept or decline", value: "none yet" },
+      { source: "OPS", label: "Tendered to partner", value: shortTime(c.latestAssignAt), via: modeApp(o.mode) },
+      { source: "PARTNER", label: "Accept or decline", value: "none yet", via: modeApp(o.mode) },
       { source: "OPS", label: "Response SLA", value: `${SLA.tenderResponseMinutes} min` },
     ],
     estimatedImpactUsd: round(o.revenueUsd),
@@ -420,8 +489,8 @@ function detectPickupMissed(
       `${shortTime(o.tender.pickupAppt)}, but there is still no pickup ${late} later. The freight is sitting ` +
       `at the dock. If this shipment delivers late, it hits the on-time score that Aequus is graded on.`,
     evidence: [
-      { source: "OPS", label: "Pickup appt", value: shortTime(o.tender.pickupAppt) },
-      { source: "PARTNER", label: "Picked up", value: "none yet" },
+      { source: "OPS", label: "Pickup appt", value: shortTime(o.tender.pickupAppt), via: "email" },
+      { source: "PARTNER", label: "Picked up", value: "none yet", via: modeApp(o.mode) },
       { source: "OPS", label: "Grace window", value: `${SLA.pickupGraceMinutes} min` },
     ],
     estimatedImpactUsd: round(o.revenueUsd),
@@ -463,8 +532,8 @@ function detectTrackingBlackout(
       `${ping.where} at ${shortTime(ping.at)}, which is ${quiet} ago. The limit is ` +
       `${limitHours} hours. Right now Aequus cannot tell the customer where the freight is.`,
     evidence: [
-      { source: "PARTNER", label: "Last ping", value: `${shortTime(ping.at)} (${ping.where})` },
-      { source: "PARTNER", label: "Newer update", value: "none yet" },
+      { source: "PARTNER", label: "Last ping", value: `${shortTime(ping.at)} (${ping.where})`, via: modeApp(o.mode) },
+      { source: "PARTNER", label: "Newer update", value: "none yet", via: modeApp(o.mode) },
       { source: "OPS", label: "Blackout limit", value: `${limitHours} h` },
     ],
     slaTag: "customer visibility",
@@ -503,8 +572,8 @@ function detectLateDelivery(
         `appointment was ${shortTime(appt)}. That is ${late} late. A late delivery counts against the ` +
         `on-time score that Aequus is graded on by the customer.`,
       evidence: [
-        { source: "OPS", label: "Delivery appt", value: shortTime(appt) },
-        { source: "PARTNER", label: "Delivered", value: shortTime(o.delivery.at) },
+        { source: "OPS", label: "Delivery appt", value: shortTime(appt), via: "email" },
+        { source: "PARTNER", label: "Delivered", value: shortTime(o.delivery.at), via: modeApp(o.mode) },
         { source: "OPS", label: "Late by", value: late },
       ],
       estimatedImpactUsd: round(o.revenueUsd),
@@ -529,8 +598,8 @@ function detectLateDelivery(
       `that and there is still no delivery. This shipment is going to miss its appointment. A late delivery ` +
       `counts against the on-time score that Aequus is graded on.`,
     evidence: [
-      { source: "OPS", label: "Delivery appt", value: shortTime(appt) },
-      { source: "PARTNER", label: "Delivered", value: "none yet" },
+      { source: "OPS", label: "Delivery appt", value: shortTime(appt), via: "email" },
+      { source: "PARTNER", label: "Delivered", value: "none yet", via: modeApp(o.mode) },
       { source: "OPS", label: "Overdue by", value: over },
     ],
     estimatedImpactUsd: round(o.revenueUsd),
@@ -566,8 +635,8 @@ function detectPodMissing(
       `ago, but the proof of delivery is still not on file. The limit is ${SLA.podHours} hours. Aequus ` +
       `cannot bill ${o.customer} for this shipment until the POD comes in.`,
     evidence: [
-      { source: "PARTNER", label: "Delivered", value: shortTime(o.delivery.at) },
-      { source: "PARTNER", label: "POD on file", value: "no record" },
+      { source: "PARTNER", label: "Delivered", value: shortTime(o.delivery.at), via: modeApp(o.mode) },
+      { source: "PARTNER", label: "POD on file", value: "no record", via: "email" },
       { source: "OPS", label: "POD SLA", value: `${SLA.podHours} h` },
     ],
     estimatedImpactUsd: round(o.revenueUsd),
@@ -605,10 +674,10 @@ function detectInvoiceMismatch(c: ShipmentCtx, push: (r: ExceptionDraft) => void
         `${usd(o.partnerCostUsd)}. That is ${usd(overage)} over. ${accSentence}` +
         `If Aequus pays this, the extra ${usd(overage)} comes straight out of the margin on this shipment.`,
       evidence: [
-        { source: "OPS", label: "Agreed rate", value: usd(o.partnerCostUsd) },
-        { source: "PARTNER", label: `Invoice ${inv.invoiceId}`, value: usd(inv.amountUsd) },
+        { source: "OPS", label: "Agreed rate", value: usd(o.partnerCostUsd), via: modeApp(o.mode) },
+        { source: "PARTNER", label: `Invoice ${inv.invoiceId}`, value: usd(inv.amountUsd), via: "quickbooks" },
         ...(accText
-          ? [{ source: "PARTNER" as const, label: "Accessorials", value: accText }]
+          ? [{ source: "PARTNER" as const, label: "Accessorials", value: accText, via: "quickbooks" as const }]
           : []),
         { source: "OPS", label: "Over agreed by", value: usd(overage) },
       ],
@@ -639,10 +708,10 @@ function detectCustomsHold(c: ShipmentCtx, push: (r: ExceptionDraft) => void) {
       `Storage charges start after today. Nothing moves until the hold clears, and Aequus cannot promise a ` +
       `delivery date while it is on.`,
     evidence: [
-      { source: "OPS", label: "Promised delivery", value: appt ? shortTime(appt) : "not set" },
+      { source: "OPS", label: "Promised delivery", value: appt ? shortTime(appt) : "not set", via: "email" },
       { source: "OPS", label: "Customer", value: o.customer },
-      { source: "PARTNER", label: "Hold placed", value: shortTime(hold.at) },
-      { source: "PARTNER", label: "Reason", value: hold.reason },
+      { source: "PARTNER", label: "Hold placed", value: shortTime(hold.at), via: "ace" },
+      { source: "PARTNER", label: "Reason", value: hold.reason, via: "ace" },
     ],
     estimatedImpactUsd: 850,
     slaTag: "clearance blocked",
@@ -675,10 +744,10 @@ function detectBookingRolled(c: ShipmentCtx, push: (r: ExceptionDraft) => void) 
         ? `That is past the delivery date Aequus promised, so the customer date is at risk.`
         : `The new date still fits the promise, but the schedule has slipped and needs a look.`),
     evidence: [
-      { source: "OPS", label: "Booked vessel", value: rolled.fromVessel },
-      { source: "OPS", label: "Promised delivery", value: appt ? shortTime(appt) : "not set" },
-      { source: "PARTNER", label: "Rolled to vessel", value: rolled.toVessel },
-      { source: "PARTNER", label: "New ETD", value: shortTime(rolled.newEtd) },
+      { source: "OPS", label: "Booked vessel", value: rolled.fromVessel, via: "oceanline" },
+      { source: "OPS", label: "Promised delivery", value: appt ? shortTime(appt) : "not set", via: "email" },
+      { source: "PARTNER", label: "Rolled to vessel", value: rolled.toVessel, via: "oceanline" },
+      { source: "PARTNER", label: "New ETD", value: shortTime(rolled.newEtd), via: "oceanline" },
     ],
     estimatedImpactUsd: 1200,
     slaTag: "schedule slip",

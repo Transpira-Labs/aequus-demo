@@ -34,6 +34,21 @@
 
 export type SourceSystem = "OPS" | "PARTNER";
 
+/**
+ * The outside tool a message arrived through. Aequus runs its day across many
+ * apps: Truckstop for road freight, QuickBooks for the money, ACE for customs
+ * entries, partner portals for air and ocean, and plain email. The platform
+ * connects to each one, and every message is attributed to the app it came
+ * through, so every fact on screen can say where it came from.
+ */
+export type SourceApp =
+  | "truckstop"
+  | "quickbooks"
+  | "ace"
+  | "airline"
+  | "oceanline"
+  | "email";
+
 /** How the freight moves. Drives labels, tracking windows, and customs events. */
 export type TransportMode = "road" | "air" | "ocean";
 
@@ -50,7 +65,10 @@ export type EventType =
   | "invoice.submitted"
   | "customs.hold"
   | "customs.cleared"
-  | "booking.rolled";
+  | "booking.rolled"
+  | "connector.degraded"
+  | "connector.restored"
+  | "connector.auth_expiring";
 
 export interface Stop {
   name: string; // e.g. "Bayport Container Terminal"
@@ -156,6 +174,17 @@ export interface BookingRolledPayload {
   newEtd: string; // ISO datetime the new sailing departs
 }
 
+/**
+ * A status message about one of the connected apps, from the platform's own
+ * sync layer. Not tied to any shipment.
+ */
+export interface ConnectorStatusPayload {
+  app: SourceApp;
+  at: string; // ISO datetime
+  note?: string; // e.g. "Status feed running behind"
+  expiresAt?: string; // for auth_expiring: when the login token dies
+}
+
 export type EventPayload =
   | ShipmentTenderedPayload
   | ShipmentAssignedPayload
@@ -168,7 +197,8 @@ export type EventPayload =
   | InvoiceSubmittedPayload
   | CustomsHoldPayload
   | CustomsClearedPayload
-  | BookingRolledPayload;
+  | BookingRolledPayload
+  | ConnectorStatusPayload;
 
 /** The envelope every message arrives in, regardless of source system. */
 export interface FeedEvent {
@@ -208,6 +238,8 @@ export interface Evidence {
   source: SourceSystem;
   label: string; // e.g. "Agreed rate"
   value: string; // e.g. "$1,850"
+  /** The app the fact was read from, e.g. QuickBooks. Shown under the value. */
+  via?: SourceApp;
 }
 
 export interface ExceptionRecord {
@@ -263,12 +295,34 @@ export interface ShipmentEntity {
   partnerCostUsd: number; // agreed partner rate, 0 until assigned
 }
 
+/** How a connected app is doing right now. */
+export type ConnectorStatus = "connected" | "slow" | "attention";
+
+/**
+ * One connected outside system, derived from the feed like everything else.
+ * "slow" means the feed is running behind right now. "attention" means the
+ * login token is about to die and someone should renew it.
+ */
+export interface ConnectorEntity {
+  app: SourceApp;
+  status: ConnectorStatus;
+  lastEventAt?: string; // newest message that arrived through this app
+  eventsToday: number;
+  /** Set while the feed is degraded, e.g. "Status feed running behind". */
+  note?: string;
+  /** Set when the app's login token is about to die. */
+  authExpiresAt?: string;
+  /** A degraded window that already recovered, kept for the panel. */
+  incident?: { from: string; to: string; note: string };
+}
+
 /** The full reconciled state at a moment in (simulated) time. */
 export interface GraphState {
   simTime: string; // ISO datetime the state was computed at
   events: FeedEvent[]; // everything ingested so far, occurredAt order
   shipments: Record<string, ShipmentEntity>;
   exceptions: ExceptionRecord[]; // newest first
+  connectors: ConnectorEntity[]; // one per connected app, fixed order
 }
 
 // ── Issue pattern history ───────────────────────────────────────────────────

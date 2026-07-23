@@ -638,3 +638,89 @@ describe("scenario integration", () => {
     expect(Object.keys(s.shipments)).toHaveLength(20);
   });
 });
+
+// ── connected apps ───────────────────────────────────────────────────────────
+
+describe("connectors", () => {
+  it("derives one connector per app, in a fixed order", () => {
+    const s = at(SCENARIO_EVENTS, SCENARIO_END);
+    expect(s.connectors.map((c) => c.app)).toEqual([
+      "truckstop",
+      "quickbooks",
+      "ace",
+      "airline",
+      "oceanline",
+      "email",
+    ]);
+  });
+
+  it("attributes each message to the app it arrived through", () => {
+    const evs = [
+      tender("m1", D("08:00"), "AEQ-1"), // email
+      assign("m2", D("08:10"), "AEQ-1", BAYOU, 1000), // road → truckstop
+      tender("m3", D("08:00"), "AEQ-2", { mode: "ocean", international: true }),
+      status("m4", D("09:00"), "AEQ-2"), // ocean → oceanline
+      customsHold("m5", D("10:00"), "AEQ-2"), // ace
+      invoice("m6", D("11:00"), "AEQ-1", "INV-1", 1000), // quickbooks
+      tender("m7", D("08:00"), "AEQ-3", { mode: "air" }),
+      pickup("m8", D("09:30"), "AEQ-3"), // air → airline
+    ];
+    const s = at(evs, D("12:00"));
+    const by = Object.fromEntries(s.connectors.map((c) => [c.app, c]));
+    expect(by.email.eventsToday).toBe(3);
+    expect(by.truckstop.eventsToday).toBe(1);
+    expect(by.oceanline.eventsToday).toBe(1);
+    expect(by.ace.eventsToday).toBe(1);
+    expect(by.quickbooks.eventsToday).toBe(1);
+    expect(by.airline.eventsToday).toBe(1);
+    sameInstant(by.quickbooks.lastEventAt!, D("11:00"));
+  });
+
+  it("marks a feed slow while degraded, then keeps the incident after recovery", () => {
+    const s1 = at(SCENARIO_EVENTS, D("10:00"));
+    const tsSlow = s1.connectors.find((c) => c.app === "truckstop")!;
+    expect(tsSlow.status).toBe("slow");
+    expect(tsSlow.note).toBe("Status feed running behind");
+
+    const s2 = at(SCENARIO_EVENTS, SCENARIO_END);
+    const ts = s2.connectors.find((c) => c.app === "truckstop")!;
+    expect(ts.status).toBe("connected");
+    expect(ts.note).toBeUndefined();
+    sameInstant(ts.incident!.from, D("09:40"));
+    sameInstant(ts.incident!.to, D("10:10"));
+  });
+
+  it("flags a dying login as needing attention", () => {
+    const s = at(SCENARIO_EVENTS, SCENARIO_END);
+    const qb = s.connectors.find((c) => c.app === "quickbooks")!;
+    expect(qb.status).toBe("attention");
+    sameInstant(qb.authExpiresAt!, "2026-07-23T08:15:00Z");
+  });
+
+  it("does not attach connector messages to any shipment", () => {
+    const s = at(SCENARIO_EVENTS, SCENARIO_END);
+    for (const o of Object.values(s.shipments)) {
+      for (const e of o.events) {
+        expect(e.type.startsWith("connector.")).toBe(false);
+      }
+    }
+  });
+
+  it("stamps the app on invoice mismatch evidence", () => {
+    const s = at(SCENARIO_EVENTS, SCENARIO_END);
+    const ex = s.exceptions.find(
+      (e) => e.id === "INVOICE_MISMATCH:AEQ-7305:INV-88412"
+    )!;
+    const agreed = ex.evidence.find((v) => v.label === "Agreed rate")!;
+    const billed = ex.evidence.find((v) => v.label.startsWith("Invoice"))!;
+    expect(agreed.via).toBe("truckstop");
+    expect(billed.via).toBe("quickbooks");
+  });
+
+  it("stamps ACE on customs hold evidence", () => {
+    const s = at(SCENARIO_EVENTS, SCENARIO_END);
+    const ex = s.exceptions.find((e) => e.id === "CUSTOMS_HOLD:AEQ-7319")!;
+    const hold = ex.evidence.find((v) => v.label === "Hold placed")!;
+    expect(hold.via).toBe("ace");
+  });
+});

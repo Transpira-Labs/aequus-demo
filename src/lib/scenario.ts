@@ -25,7 +25,7 @@
  * authored grouped by shipment below for readability, then sorted once at load.
  */
 
-import { FeedEvent, PartnerRef, Stop, TransportMode } from "./types";
+import { FeedEvent, PartnerRef, SourceApp, Stop, TransportMode } from "./types";
 
 export const SCENARIO_START = "2026-07-20T06:00:00Z";
 export const SCENARIO_END = "2026-07-20T20:00:00Z";
@@ -267,6 +267,23 @@ function bookingRolled(
   };
 }
 
+function connectorEvent(
+  messageId: string,
+  occurredAt: string,
+  type: "connector.degraded" | "connector.restored" | "connector.auth_expiring",
+  app: SourceApp,
+  note?: string,
+  expiresAt?: string
+): FeedEvent {
+  return {
+    messageId,
+    source: "OPS",
+    type,
+    occurredAt,
+    payload: { app, at: occurredAt, note, expiresAt },
+  };
+}
+
 // customer names
 const GCP = "Gulf Coast Polymers";
 const PERMIAN = "Permian Energy Services";
@@ -283,6 +300,17 @@ const NEXT = (t: string) => `2026-07-21T${t}:00Z`;
 // ── the day, grouped by shipment ─────────────────────────────────────────────
 
 const RAW: FeedEvent[] = [
+  // ── CONNECTOR: QuickBooks login token runs out in three days ────────────────
+  // The platform holds the keys to each connected app and flags a dying login
+  // early, instead of the feed just going quiet the way old connectors did.
+  connectorEvent("SYS-000010", T("08:15"), "connector.auth_expiring", "quickbooks", "Login token runs out in 3 days", "2026-07-23T08:15:00Z"),
+
+  // ── CONNECTOR: Truckstop feed slows for half an hour, then catches up ───────
+  // The feed slows mid morning. The platform says so while it is happening,
+  // then confirms when the feed catches up on its own.
+  connectorEvent("SYS-000020", T("09:40"), "connector.degraded", "truckstop", "Status feed running behind"),
+  connectorEvent("SYS-000021", T("10:10"), "connector.restored", "truckstop"),
+
   // ── CLEAN: AEQ-7301, Gulf Coast Polymers, Houston TX → Corpus Christi TX ────
   tender("OPS-000010", T("06:15"), "AEQ-7301", GCP, HOU_POLY, CORPUS, T("08:30"), T("12:00"), "53' dry van", 32400, 1450, "road", "PO-GC-20441"),
   assign("OPS-000011", T("06:25"), "AEQ-7301", BAYOU, 1150),
